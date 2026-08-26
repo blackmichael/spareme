@@ -16,6 +16,7 @@ describe('score entry flow', () => {
     await user.click(screen.getByRole('button', { name: /start bowling/i }))
     expect(screen.getByText('Now bowling')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Ada' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /new game/i })).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /strike/i }))
     expect(screen.getByText('Frame 2', { exact: false })).toBeInTheDocument()
@@ -92,13 +93,29 @@ describe('score entry flow', () => {
     expect(screen.getByRole('rowheader', { name: /Grace/ })).toBeInTheDocument()
   })
 
+  it('adds a player when Enter is pressed in a name field', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    const firstPlayer = screen.getByLabelText('Player 1 name')
+    await user.type(firstPlayer, 'Ada')
+    await user.keyboard('{Enter}')
+
+    expect(screen.getByLabelText('Player 2 name')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('Ada')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: "Who's bowling?" })).toBeInTheDocument()
+  })
+
   it('offers a rematch with the previous lineup', async () => {
     const user = userEvent.setup()
     const rendered = render(<App />)
 
     await user.type(screen.getByLabelText('Player 1 name'), 'Ada')
     await user.click(screen.getByRole('button', { name: /start bowling/i }))
-    await user.click(screen.getByRole('button', { name: /new game/i }))
+    for (let roll = 0; roll < 20; roll += 1) {
+      await user.click(screen.getByRole('button', { name: /miss/i }))
+    }
+    await user.click(screen.getByRole('button', { name: /start another/i }))
 
     expect(screen.getByLabelText('Player 1 name')).toHaveValue('')
     await user.click(screen.getByRole('button', { name: /rematch/i }))
@@ -154,6 +171,8 @@ describe('score entry flow', () => {
     for (let roll = 0; roll < 20; roll += 1) {
       await user.click(screen.getByRole('button', { name: /miss/i }))
     }
+
+    expect(screen.queryByText(/high game/i)).not.toBeInTheDocument()
 
     const confirm = vi.spyOn(window, 'confirm')
     await user.click(screen.getByRole('button', { name: /spare me home/i }))

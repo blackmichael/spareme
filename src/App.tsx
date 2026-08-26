@@ -77,6 +77,10 @@ function Setup({ history, onStart, onViewHistory, initialNames }: {
     setNames((current) => current.map((name, i) => i === index ? value : name))
   }
 
+  const addPlayer = () => {
+    if (names.length < 10) setNames([...names, ''])
+  }
+
   const start = () => {
     const playerNames = names.map((name, index) => name.trim() || `Player ${index + 1}`)
     onStart(playerNames)
@@ -106,7 +110,11 @@ function Setup({ history, onStart, onViewHistory, initialNames }: {
                 aria-label={`Player ${index + 1} name`}
                 maxLength={24}
                 onChange={(event) => updateName(index, event.target.value)}
-                onKeyDown={(event) => event.key === 'Enter' && start()}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter') return
+                  event.preventDefault()
+                  addPlayer()
+                }}
                 placeholder={`Player ${index + 1}`}
                 value={name}
               />
@@ -117,7 +125,7 @@ function Setup({ history, onStart, onViewHistory, initialNames }: {
           ))}
         </div>
         <div className="setup-actions">
-          <button className="button secondary" disabled={names.length >= 10} onClick={() => setNames([...names, ''])}>+ Add player</button>
+          <button className="button secondary" disabled={names.length >= 10} onClick={addPlayer}>+ Add player</button>
           <button className="button primary" onClick={start}>Start bowling <span>→</span></button>
         </div>
       </section>
@@ -391,7 +399,6 @@ function ScorecardMode({ game, history, onSelectGame, onDelete, onEdit, isArchiv
         <div>
           <h1>{formatDate(game.completedAt ?? game.createdAt)}</h1>
         </div>
-        {game.status === 'completed' && <div className="winner">High game <strong>{[...game.players].sort((a, b) => totalScore(b) - totalScore(a))[0].name}</strong></div>}
       </section>
        <Scorecard game={game} onEdit={onEdit} />
       {history.length > 0 && (
@@ -587,7 +594,6 @@ export default function App() {
                 <button className={view === 'entry' && !selectedHistoryId ? 'active' : ''} disabled={activeGame.status === 'completed'} onClick={() => { setSelectedHistoryId(null); setView('entry') }}>Enter scores</button>
                 <button className={view === 'scorecard' || !!selectedHistoryId ? 'active' : ''} onClick={() => { setSelectedHistoryId(null); setView('scorecard') }}>Scorecard</button>
               </nav>}
-              <button className="new-game-button" onClick={newGame}>New game</button>
             </>
           )}
         </div>
