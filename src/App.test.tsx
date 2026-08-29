@@ -144,22 +144,39 @@ describe('score entry flow', () => {
     vi.restoreAllMocks()
   })
 
-  it('uses the logo to return home and confirms when scores exist', async () => {
+  it('keeps the game when abandoning is cancelled', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(window, 'confirm').mockReturnValue(false)
+    render(<App />)
+
+    await user.type(screen.getByLabelText('Player 1 name'), 'Ada')
+    await user.click(screen.getByRole('button', { name: /start bowling/i }))
+    await user.click(screen.getByRole('button', { name: /strike/i }))
+    await user.click(screen.getByRole('button', { name: /abandon game/i }))
+
+    expect(screen.getByText('Now bowling')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Ada' })).toBeInTheDocument()
+    expect(localStorage.getItem('lane-ten:v1')).toContain('"activeGame"')
+    vi.restoreAllMocks()
+  })
+
+  it('uses the logo to return home without abandoning an active game', async () => {
     const user = userEvent.setup()
     render(<App />)
 
     await user.type(screen.getByLabelText('Player 1 name'), 'Ada')
     await user.click(screen.getByRole('button', { name: /start bowling/i }))
     await user.click(screen.getByRole('button', { name: /spare me home/i }))
-    expect(screen.getByRole('heading', { name: "Who's bowling?" })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Back to bowling' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /resume game/i })).toBeInTheDocument()
+    expect(screen.getByText('Ada')).toBeInTheDocument()
+    expect(screen.getByText('0', { selector: 'strong' })).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: /start bowling/i }))
+    await user.click(screen.getByRole('button', { name: /resume game/i }))
     await user.click(screen.getByRole('button', { name: /strike/i }))
-    vi.spyOn(window, 'confirm').mockReturnValue(false)
     await user.click(screen.getByRole('button', { name: /spare me home/i }))
-    expect(screen.getByText('Now bowling')).toBeInTheDocument()
-    expect(window.confirm).toHaveBeenCalled()
-    vi.restoreAllMocks()
+    expect(screen.getByRole('button', { name: /resume game/i })).toBeInTheDocument()
+    expect(localStorage.getItem('lane-ten:v1')).toContain('"activeGame"')
   })
 
   it('returns home from a completed game without abandoning its saved score', async () => {
@@ -234,5 +251,20 @@ describe('score entry flow', () => {
     await user.click(screen.getByRole('button', { name: 'Back' }))
     expect(screen.getByText('Now bowling')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Ada' })).toBeInTheDocument()
+  })
+
+  it('restores an active game after the app is reloaded', async () => {
+    const user = userEvent.setup()
+    const rendered = render(<App />)
+
+    await user.type(screen.getByLabelText('Player 1 name'), 'Ada')
+    await user.click(screen.getByRole('button', { name: /start bowling/i }))
+    await user.click(screen.getByRole('button', { name: /strike/i }))
+    rendered.unmount()
+    render(<App />)
+
+    expect(screen.getByText('Now bowling')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Ada' })).toBeInTheDocument()
+    expect(screen.getByText('Frame 2', { exact: false })).toBeInTheDocument()
   })
 })

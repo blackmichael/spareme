@@ -72,9 +72,12 @@ function SiteFooter({ onAbout, theme, onToggleTheme }: { onAbout: () => void, th
   )
 }
 
-function Setup({ history, onStart, onViewHistory, initialNames }: {
+function Setup({ history, activeGame, onStart, onResume, onAbandon, onViewHistory, initialNames }: {
   history: Game[]
+  activeGame: Game | null
   onStart: (names: string[]) => void
+  onResume: () => void
+  onAbandon: () => void
   onViewHistory: (id: string) => void
   initialNames?: string[]
 }) {
@@ -97,53 +100,73 @@ function Setup({ history, onStart, onViewHistory, initialNames }: {
     <main className="setup-layout">
       <section className="setup-card panel">
         <div className="setup-intro">
-          <h1>Who's bowling?</h1>
-          <div className="setup-subline">
-            <p className="lede">Add up to ten players.</p>
-            {initialNames?.length ? (
-              <button className="rematch-button" onClick={() => setNames(initialNames)}>
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
-                  <path d="M3 3v5h5" />
-                </svg>
-                Rematch
-              </button>
-            ) : null}
-          </div>
-        </div>
-        <div className="player-fields">
-          {names.map((name, index) => (
-            <div className="player-field" key={index}>
-              <span className="player-number">{String(index + 1).padStart(2, '0')}</span>
-              <input
-                aria-label={`Player ${index + 1} name`}
-                maxLength={24}
-                onChange={(event) => updateName(index, event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key !== 'Enter') return
-                  event.preventDefault()
-                  addPlayer()
-                }}
-                placeholder={`Player ${index + 1}`}
-                value={name}
-              />
-              {names.length > 1 && (
-                <button className="icon-button" aria-label={`Remove player ${index + 1}`} onClick={() => setNames(names.filter((_, i) => i !== index))}>×</button>
-              )}
+          <h1>{activeGame?.status === 'active' ? 'Back to bowling' : "Who's bowling?"}</h1>
+          {activeGame?.status !== 'active' ? (
+            <div className="setup-subline">
+              <p className="lede">Add up to 10 players.</p>
+              {initialNames?.length ? (
+                <button className="rematch-button" onClick={() => setNames(initialNames)}>
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+                    <path d="M3 3v5h5" />
+                  </svg>
+                  Rematch
+                </button>
+              ) : null}
             </div>
-          ))}
+          ) : null}
         </div>
-        <div className="setup-actions">
-          <button className="button secondary" disabled={names.length >= 10} onClick={addPlayer}>+ Add player</button>
-          <button className="button primary" onClick={start}>Start bowling <span>→</span></button>
-        </div>
+        {activeGame?.status === 'active' ? (
+          <div className="setup-resume">
+            <p className="eyebrow">Game in progress</p>
+            <ul>
+              {activeGame.players.map((player) => (
+                <li key={player.id}>
+                  <span>{player.name}</span>
+                  <strong><span className="sr-only">Score: </span>{totalScore(player)}</strong>
+                </li>
+              ))}
+            </ul>
+            <button className="button primary" onClick={onResume}>Resume game <span>→</span></button>
+            <button className="abandon-game-button" onClick={onAbandon}>Abandon game</button>
+          </div>
+        ) : (
+          <>
+            <div className="player-fields">
+              {names.map((name, index) => (
+                <div className="player-field" key={index}>
+                  <span className="player-number">{String(index + 1).padStart(2, '0')}</span>
+                  <input
+                    aria-label={`Player ${index + 1} name`}
+                    maxLength={24}
+                    onChange={(event) => updateName(index, event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key !== 'Enter') return
+                      event.preventDefault()
+                      addPlayer()
+                    }}
+                    placeholder={`Player ${index + 1}`}
+                    value={name}
+                  />
+                  {names.length > 1 && (
+                    <button className="icon-button" aria-label={`Remove player ${index + 1}`} onClick={() => setNames(names.filter((_, i) => i !== index))}>×</button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="setup-actions">
+              <button className="button secondary" disabled={names.length >= 10} onClick={addPlayer}>+ Add player</button>
+              <button className="button primary" onClick={start}>Start bowling <span>→</span></button>
+            </div>
+          </>
+        )}
       </section>
         <aside className="history-rail">
           <div className="section-heading">
             <h2>Past games</h2>
           </div>
         {history.length === 0 ? (
-          <div className="empty-history">Completed games will wait here for the rematch.</div>
+          <div className="empty-history">Completed games appear here. Select one to review it or start a rematch.</div>
         ) : history.slice(0, 6).map((game) => (
           <button className="history-item" key={game.id} onClick={() => onViewHistory(game.id)}>
             <span>{formatDate(game.completedAt ?? game.createdAt)}</span>
@@ -430,6 +453,7 @@ function formatDate(date: string): string {
 export default function App() {
   const [data, setData] = useState<AppData>(loadData)
   const [page, setPage] = useState<Page>(() => window.location.pathname === '/about' ? 'about' : 'app')
+  const [showSetup, setShowSetup] = useState(false)
   const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null)
   const [editingFrame, setEditingFrame] = useState<{ playerIndex: number, frameIndex: number } | null>(null)
   const activeGame = data.activeGame
@@ -456,6 +480,7 @@ export default function App() {
   const startGame = (names: string[]) => {
     setData((current) => ({ ...current, activeGame: createGame(names) }))
     setSelectedHistoryId(null)
+    setShowSetup(false)
   }
 
   const addRoll = (pins: number) => {
@@ -506,6 +531,7 @@ export default function App() {
       lastPlayers: activeGame?.players.map((player) => player.name) ?? current.lastPlayers,
     }))
     setSelectedHistoryId(null)
+    setShowSetup(true)
   }
 
   const abandonGame = () => {
@@ -517,24 +543,12 @@ export default function App() {
       lastPlayers: current.lastPlayers,
     }))
     setSelectedHistoryId(null)
+    setShowSetup(true)
   }
 
   const goHome = () => {
-    if (!activeGame) {
-      setSelectedHistoryId(null)
-      return
-    }
-    const shouldAbandon = activeGame.status === 'active'
-    if (shouldAbandon && activeGame.rollLog.length > 0 && !window.confirm('Abandon this game? All scores will be permanently erased.')) return
-    setData((current) => ({
-      ...current,
-      activeGame: null,
-      history: shouldAbandon
-        ? current.history.filter((game) => game.id !== activeGame.id)
-        : current.history,
-      lastPlayers: current.lastPlayers,
-    }))
     setSelectedHistoryId(null)
+    setShowSetup(true)
   }
 
   const deleteGame = (id: string) => {
@@ -586,8 +600,8 @@ export default function App() {
         <AboutPage />
       ) : selectedHistoryId && displayedGame ? (
         <main className="content"><ScorecardMode game={displayedGame} history={data.history} onSelectGame={setSelectedHistoryId} onDelete={deleteGame} isArchiveView /></main>
-      ) : !activeGame ? (
-        <Setup history={data.history} initialNames={data.lastPlayers} onStart={startGame} onViewHistory={viewHistory} />
+      ) : !activeGame || showSetup ? (
+        <Setup history={data.history} activeGame={activeGame} initialNames={data.lastPlayers} onStart={startGame} onResume={() => setShowSetup(false)} onAbandon={abandonGame} onViewHistory={viewHistory} />
       ) : activeGame.status === 'completed' && !selectedHistoryId ? (
         <main className="content">
           <div className="complete-banner"><span>Game complete</span><button className="button primary" onClick={newGame}>Start another →</button></div>
