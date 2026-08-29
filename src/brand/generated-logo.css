@@ -1,0 +1,13 @@
+.wordmark {
+  --brand-wordmark-text: #173f42;
+  --brand-pin-body: #fffaf0;
+  --brand-pin-outline: #173f42;
+  --brand-pin-stripe: #a53630;
+}
+
+[data-theme='dark'] .wordmark {
+  --brand-wordmark-text: #f3ead8;
+  --brand-pin-body: #f3ead8;
+  --brand-pin-outline: #0b1d1f;
+  --brand-pin-stripe: #b83f38;
+}

@@ -2,22 +2,10 @@ import { useEffect, useState } from 'react'
 import { createGame, frameScores, isFrameComplete, maxPinsForFrame, recordRoll, replaceFrame, rollMark, totalScore, undoRoll } from './scoring'
 import { loadData, saveData } from './storage'
 import type { AppData, Frame, Game, Player } from './types'
+import { Wordmark } from './brand/Wordmark'
 
 type View = 'entry' | 'scorecard'
 type Page = 'app' | 'about'
-
-function Wordmark() {
-  return (
-    <span className="wordmark">
-      <span>spare</span>
-      <svg className="brand-pin" viewBox="2 0 20 40" aria-hidden="true">
-        <path className="brand-pin-body" d="M12 1c-2.2 0-3.6 1.8-3.6 4.4 0 2.2.8 3.7.95 5.7.2 2.7-.9 5.1-2.45 8-1.7 3.3-2.05 6.5-2 10 .1 3.3 1.4 6.3 3.6 8.5h7c2.2-2.2 3.5-5.2 3.6-8.5.05-3.5-.3-6.7-2-10-1.55-2.9-2.65-5.3-2.45-8 .15-2 .95-3.5.95-5.7C15.6 2.8 14.2 1 12 1Z" />
-        <path className="brand-pin-stripe" d="M9.15 10.1c1.86.5 3.84.5 5.7 0M9.25 12.65c1.8.45 3.7.45 5.5 0" />
-      </svg>
-      <span>me</span>
-    </span>
-  )
-}
 
 function AboutPage({ onHome }: { onHome: () => void }) {
   return (

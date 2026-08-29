@@ -4,9 +4,14 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "predev": "npm run generate:brand",
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "generate:brand": "node scripts/generate-brand-assets.mjs",
+    "generate:brand:check": "node scripts/generate-brand-assets.mjs --check",
+    "build": "npm run generate:brand && tsc -b && vite build",
+    "pretest": "npm run generate:brand:check",
     "test": "vitest run",
+    "pretypecheck": "npm run generate:brand:check",
     "typecheck": "tsc -b --pretty false"
   },
   "dependencies": {
@@ -20,11 +25,14 @@
     "vite": "latest"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "@testing-library/jest-dom": "latest",
     "@testing-library/react": "latest",
     "@testing-library/user-event": "latest",
+    "@types/node": "^26.3.0",
     "@types/react": "latest",
     "@types/react-dom": "latest",
+    "fontkit": "^2.0.4",
     "jsdom": "latest",
     "typescript": "latest",
     "vitest": "latest"
