@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createGame, frameScores, isFrameComplete, maxPinsForFrame, recordRoll, replaceFrame, rollMark, totalScore, undoRoll } from './scoring'
 import { loadData, saveData } from './storage'
 import type { AppData, Frame, Game } from './types'
@@ -11,29 +11,29 @@ function AboutPage() {
     <main className="about-page content">
       <section className="about-hero">
         <h1 aria-label="A better way to keep score.">A better way<br />to keep score.</h1>
-        <p className="lede">spare me is a simple scorekeeper for bowling nights, built to stay out of the way while you play.</p>
+        <p className="lede">spare me tracks your bowling scores so you can focus on the pins.</p>
       </section>
       <div className="about-grid">
         <section className="about-card panel">
-          <p className="eyebrow">How it works</p>
-          <h2>Made for the lane</h2>
-          <p>Set your lineup, tap what happened, and spare me handles the scoring. Pick up where you left off whenever you return.</p>
-          <p>Bring up to ten bowlers, undo the last roll when somebody taps too quickly, and revisit completed games in the archive for the next rematch.</p>
+          <p className="eyebrow">Score a game</p>
+          <h2>Keep the game moving</h2>
+          <p>Enter each roll, and spare me calculates frame totals and running scores.</p>
+          <p>Undo a roll when you tap too quickly. Review completed games in the archive or start a rematch.</p>
         </section>
         <section className="about-card panel">
-          <p className="eyebrow">The basics</p>
+          <p className="eyebrow">Bowling rules</p>
           <h2>How scoring works</h2>
           <dl className="scoring-guide">
-            <div><dt>Open frame</dt><dd>Add the pins from the two rolls. The frame score is 0–9.</dd></div>
-            <div><dt><span className="score-symbol" aria-hidden="true">/</span> Spare</dt><dd>Ten pins across two rolls, plus the pins from your next roll.</dd></div>
-            <div><dt><span className="score-symbol" aria-hidden="true">X</span> Strike</dt><dd>All ten pins on the first roll, plus your next two rolls.</dd></div>
-            <div><dt>Frame 10</dt><dd>A spare earns one bonus roll; a strike earns two. You can score up to 30 points.</dd></div>
+            <div><dt>Open frame</dt><dd>Add the pins from both rolls. The frame score ranges from 0 to 9.</dd></div>
+            <div><dt><span className="score-symbol" aria-hidden="true">/</span> Spare</dt><dd>Knock down 10 pins in 2 rolls, then add your next roll.</dd></div>
+            <div><dt><span className="score-symbol" aria-hidden="true">X</span> Strike</dt><dd>Knock down all 10 pins on your first roll, then add your next 2 rolls.</dd></div>
+            <div><dt>Frame 10</dt><dd>A spare earns 1 bonus roll. A strike earns 2. The highest possible score is 30.</dd></div>
           </dl>
         </section>
       </div>
       <section className="about-note">
         <strong>Perfect game: 300</strong>
-        <span>Ten strikes, with two bonus strikes in the tenth frame.</span>
+        <span>A perfect game requires 10 strikes and 2 bonus strikes in the tenth frame.</span>
       </section>
     </main>
   )
@@ -98,16 +98,18 @@ function Setup({ history, onStart, onViewHistory, initialNames }: {
       <section className="setup-card panel">
         <div className="setup-intro">
           <h1>Who's bowling?</h1>
-          <p className="lede">Add up to ten players.</p>
-          {initialNames?.length ? (
-            <button className="rematch-button" onClick={() => setNames(initialNames)}>
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
-                <path d="M3 3v5h5" />
-              </svg>
-              Rematch
-            </button>
-          ) : null}
+          <div className="setup-subline">
+            <p className="lede">Add up to ten players.</p>
+            {initialNames?.length ? (
+              <button className="rematch-button" onClick={() => setNames(initialNames)}>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+                  <path d="M3 3v5h5" />
+                </svg>
+                Rematch
+              </button>
+            ) : null}
+          </div>
         </div>
         <div className="player-fields">
           {names.map((name, index) => (
@@ -136,11 +138,10 @@ function Setup({ history, onStart, onViewHistory, initialNames }: {
           <button className="button primary" onClick={start}>Start bowling <span>→</span></button>
         </div>
       </section>
-      <aside className="history-rail">
-        <div className="section-heading">
-          <p className="eyebrow">Local archive</p>
-          <h2>Past games</h2>
-        </div>
+        <aside className="history-rail">
+          <div className="section-heading">
+            <h2>Past games</h2>
+          </div>
         {history.length === 0 ? (
           <div className="empty-history">Completed games will wait here for the rematch.</div>
         ) : history.slice(0, 6).map((game) => (
@@ -244,8 +245,30 @@ function FrameEditor({ game, playerIndex, frameIndex, onSave, onClose }: {
 }
 
 function Scorecard({ game, onEdit }: { game: Game, onEdit?: (playerIndex: number, frameIndex: number) => void }) {
+  const scorecardWrapRef = useRef<HTMLDivElement>(null)
+  const activeFrameRef = useRef<HTMLTableCellElement>(null)
+
+  useEffect(() => {
+    if (game.status !== 'active' || !activeFrameRef.current || !scorecardWrapRef.current) return
+
+    const container = scorecardWrapRef.current
+    const activeFrame = activeFrameRef.current
+    const bowlerColumn = container.querySelector<HTMLElement>('.scorecard tbody th')
+    const reservedWidth = bowlerColumn?.offsetWidth ?? 0
+    const visibleWidth = container.clientWidth - reservedWidth
+    const targetScrollLeft = activeFrame.offsetLeft - reservedWidth - (visibleWidth - activeFrame.offsetWidth) / 2
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+    const left = Math.max(0, targetScrollLeft)
+
+    if (typeof container.scrollTo === 'function') {
+      container.scrollTo({ left, behavior: reduceMotion ? 'auto' : 'smooth' })
+    } else {
+      container.scrollLeft = left
+    }
+  }, [game.status, game.currentFrame])
+
   return (
-    <div className="scorecard-wrap">
+    <div className="scorecard-wrap" ref={scorecardWrapRef}>
       <table className="scorecard">
         <caption className="sr-only">Bowling scorecard</caption>
         <thead>
@@ -262,7 +285,7 @@ function Scorecard({ game, onEdit }: { game: Game, onEdit?: (playerIndex: number
               <tr className={game.status === 'active' && playerIndex === game.currentPlayer ? 'is-current' : ''} key={player.id}>
                 <th scope="row"><span className="player-dot" />{player.name}</th>
                  {player.frames.map((frame, frameIndex) => (
-                   <td className={`${game.status === 'active' && playerIndex === game.currentPlayer && frameIndex === game.currentFrame ? 'active-frame ' : ''}${onEdit && frame.length ? 'is-editable' : ''}`} key={frameIndex}>
+                   <td className={`${game.status === 'active' && playerIndex === game.currentPlayer && frameIndex === game.currentFrame ? 'active-frame ' : ''}${onEdit && frame.length ? 'is-editable' : ''}`} key={frameIndex} ref={game.status === 'active' && playerIndex === game.currentPlayer && frameIndex === game.currentFrame ? activeFrameRef : undefined}>
                      <FrameRolls frame={frame} frameIndex={frameIndex} />
                      <strong className="frame-score">{scores[frameIndex] ?? ''}</strong>
                      {onEdit && frame.length ? <button className="frame-edit-button" aria-label={`Edit ${player.name}, frame ${frameIndex + 1}`} onClick={() => onEdit(playerIndex, frameIndex)} /> : null}
