@@ -1,16 +1,14 @@
 import { useEffect, useState } from 'react'
 import { createGame, frameScores, isFrameComplete, maxPinsForFrame, recordRoll, replaceFrame, rollMark, totalScore, undoRoll } from './scoring'
 import { loadData, saveData } from './storage'
-import type { AppData, Frame, Game, Player } from './types'
+import type { AppData, Frame, Game } from './types'
 import { Wordmark } from './brand/Wordmark'
 
-type View = 'entry' | 'scorecard'
 type Page = 'app' | 'about'
 
-function AboutPage({ onHome }: { onHome: () => void }) {
+function AboutPage() {
   return (
     <main className="about-page content">
-      <button className="about-back" onClick={onHome}>← Back</button>
       <section className="about-hero">
         <h1 aria-label="A better way to keep score.">A better way<br />to keep score.</h1>
         <p className="lede">spare me is a simple scorekeeper for bowling nights, built to stay out of the way while you play.</p>
@@ -41,14 +39,35 @@ function AboutPage({ onHome }: { onHome: () => void }) {
   )
 }
 
-function SiteFooter({ onHome, onAbout }: { onHome: () => void, onAbout: () => void }) {
+function SiteFooter({ onAbout, theme, onToggleTheme }: { onAbout: () => void, theme: 'light' | 'dark', onToggleTheme: () => void }) {
   return (
     <footer className="site-footer">
       <div className="footer-main">
-        <a className="footer-brand" href="/" aria-label="spare me home" onClick={(event) => { event.preventDefault(); onHome() }}><Wordmark /></a>
-        <p>A simple bowling companion.</p>
-        <nav aria-label="Footer navigation"><a href="/about" onClick={(event) => { event.preventDefault(); onAbout() }}>About</a></nav>
+        <nav className="footer-nav" aria-label="Footer navigation">
+          <a href="/about" onClick={(event) => {
+            if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+            event.preventDefault()
+            onAbout()
+          }}>About</a>
+          <a href="https://github.com/blackmichael/spareme">
+            Source code
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8" /></svg>
+          </a>
+        </nav>
+        <div className="footer-actions">
+          <button className="theme-toggle" aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`} aria-pressed={theme === 'dark'} onClick={onToggleTheme}>
+            <span className="theme-track-icons" aria-hidden="true">
+              <svg className="sun-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.5" /><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.28 5.28 6.7 6.7M17.3 17.3l1.42 1.42M5.28 18.72 6.7 17.3M17.3 6.7l1.42-1.42" /></svg>
+              <svg className="moon-icon" viewBox="0 0 24 24"><path d="M18.8 15.9A7.8 7.8 0 0 1 8.1 5.2a7.8 7.8 0 1 0 10.7 10.7Z" /><path className="moon-star" d="m17.8 4 .45 1.05 1.05.45-1.05.45L17.8 7l-.45-1.05-1.05-.45 1.05-.45L17.8 4Z" /></svg>
+            </span>
+            <span className="theme-thumb" aria-hidden="true">
+              <svg className="thumb-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.5" /><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.28 5.28 6.7 6.7M17.3 17.3l1.42 1.42M5.28 18.72 6.7 17.3M17.3 6.7l1.42-1.42" /></svg>
+              <svg className="thumb-moon" viewBox="0 0 24 24"><path d="M18.8 15.9A7.8 7.8 0 0 1 8.1 5.2a7.8 7.8 0 1 0 10.7 10.7Z" /><path className="moon-star" d="m17.8 4 .45 1.05 1.05.45-1.05.45L17.8 7l-.45-1.05-1.05-.45 1.05-.45L17.8 4Z" /></svg>
+            </span>
+          </button>
+        </div>
       </div>
+      <p className="footer-copyright">© 2026 Spare Me. All rights reserved.</p>
     </footer>
   )
 }
@@ -259,38 +278,6 @@ function Scorecard({ game, onEdit }: { game: Game, onEdit?: (playerIndex: number
   )
 }
 
-function RecentFrames({ player, playerIndex, onEdit }: { player: Player, playerIndex: number, onEdit: (playerIndex: number, frameIndex: number) => void }) {
-  const scores = frameScores(player)
-  const lastFrame = player.frames.reduce((latest, frame, index) => frame.length > 0 ? index : latest, -1)
-  const startFrame = Math.max(0, lastFrame - 4)
-  const frames = player.frames.slice(startFrame, Math.max(startFrame + 1, lastFrame + 1))
-
-  return (
-    <section className="recent-frames panel" aria-label={`${player.name}'s recent frames`}>
-      <div className="recent-heading">
-        <div>
-          <p className="eyebrow">Score trail</p>
-          <h2>Recent frames</h2>
-        </div>
-        <strong className="running-total">{totalScore(player)}<span>total</span></strong>
-      </div>
-      <div className="recent-frame-list">
-        {frames.map((frame, offset) => {
-          const frameIndex = startFrame + offset
-          return (
-             <div className={`recent-frame ${frameIndex === 9 ? 'tenth-frame' : ''}`} key={frameIndex}>
-               <span className="recent-frame-number">{frameIndex + 1}</span>
-               <FrameRolls frame={frame} frameIndex={frameIndex} />
-               <strong>{scores[frameIndex] ?? ''}</strong>
-               {frame.length ? <button className="recent-frame-edit-button" aria-label={`Edit ${player.name}, frame ${frameIndex + 1}`} onClick={() => onEdit(playerIndex, frameIndex)} /> : null}
-             </div>
-          )
-        })}
-      </div>
-    </section>
-  )
-}
-
 function EntryMode({ game, onRoll, onUndo, onAbandon, onEdit }: { game: Game, onRoll: (pins: number) => void, onUndo: () => void, onAbandon: () => void, onEdit: (playerIndex: number, frameIndex: number) => void }) {
   const player = game.players[game.currentPlayer]
   const frame = player.frames[game.currentFrame]
@@ -318,71 +305,75 @@ function EntryMode({ game, onRoll, onUndo, onAbandon, onEdit }: { game: Game, on
 
   return (
     <div className="entry-screen">
-      <section className="now-bowling panel">
-        <div className="turn-meta">
-          <span>Frame {game.currentFrame + 1} <i>/ 10</i></span>
-          <span>Ball {frame.length + 1}</span>
-        </div>
-        <div className="current-player">
-          <p className="eyebrow">Now bowling</p>
-          <h1>{player.name}</h1>
-        </div>
-        <div className="next-up" aria-live="polite">
-          <span className="status-light" />
-          {nextPlayer ? <span>On deck <strong>{nextPlayer.name}</strong></span> : <strong>Final rolls</strong>}
-        </div>
+      <div className="entry-controls">
+        <section className="now-bowling panel">
+          <div className="turn-meta">
+            <span>Frame {game.currentFrame + 1} <i>/ 10</i></span>
+            <span>Ball {frame.length + 1}</span>
+          </div>
+          <div className="current-player">
+            <p className="eyebrow">Now bowling</p>
+            <h1>{player.name}</h1>
+          </div>
+          <div className="next-up" aria-live="polite">
+            <span className="status-light" />
+            {nextPlayer ? <span>On deck <strong>{nextPlayer.name}</strong></span> : <strong>Final rolls</strong>}
+          </div>
+        </section>
+
+        <section className="pin-pad panel" aria-label="Record knocked down pins">
+          <div className="pin-pad-heading">
+            <div>
+              <p className="eyebrow">Record the roll</p>
+              <h2>What happened?</h2>
+            </div>
+            <button className="text-button undo-button" disabled={game.rollLog.length === 0} onClick={onUndo}>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="m9 14-5-5 5-5" />
+                <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
+              </svg>
+              Undo
+            </button>
+          </div>
+          <div className="quick-outcomes">
+            {showStrike ? (
+              <button className="outcome strike" aria-label="Strike" onClick={() => onRoll(10)}><strong aria-hidden="true">X</strong><span aria-hidden="true">Strike</span><kbd aria-hidden="true">X</kbd></button>
+            ) : (
+              <button className="outcome spare" aria-label="Spare" onClick={() => onRoll(maxPins)}><strong aria-hidden="true">/</strong><span aria-hidden="true">Spare</span><kbd aria-hidden="true">/</kbd></button>
+            )}
+            <button className="outcome miss" aria-label="Miss" onClick={() => onRoll(0)}><strong aria-hidden="true">–</strong><span aria-hidden="true">Miss</span><kbd aria-hidden="true">0</kbd></button>
+          </div>
+          <div className="pin-counts">
+            <span>Pins</span>
+            <div>
+              {Array.from({ length: 9 }, (_, index) => index + 1).map((pins) => {
+                const available = numericPins.includes(pins)
+                return <button className={!available ? 'unavailable' : ''} disabled={!available} key={pins} onClick={() => onRoll(pins)}>{pins}</button>
+              })}
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <section className="active-scorecard" aria-label="Bowling scorecard">
+        <Scorecard game={game} onEdit={onEdit} />
       </section>
 
-      <section className="pin-pad panel" aria-label="Record knocked down pins">
-        <div className="pin-pad-heading">
-          <div>
-            <p className="eyebrow">Record the roll</p>
-            <h2>What happened?</h2>
-          </div>
-          <button className="text-button undo-button" disabled={game.rollLog.length === 0} onClick={onUndo}>
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="m9 14-5-5 5-5" />
-              <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
-            </svg>
-            Undo
-          </button>
-        </div>
-        <div className="quick-outcomes">
-          {showStrike ? (
-            <button className="outcome strike" aria-label="Strike" onClick={() => onRoll(10)}><strong aria-hidden="true">X</strong><span aria-hidden="true">Strike</span><kbd aria-hidden="true">X</kbd></button>
-          ) : (
-            <button className="outcome spare" aria-label="Spare" onClick={() => onRoll(maxPins)}><strong aria-hidden="true">/</strong><span aria-hidden="true">Spare</span><kbd aria-hidden="true">/</kbd></button>
-          )}
-          <button className="outcome miss" aria-label="Miss" onClick={() => onRoll(0)}><strong aria-hidden="true">–</strong><span aria-hidden="true">Miss</span><kbd aria-hidden="true">0</kbd></button>
-        </div>
-        <div className="pin-counts">
-          <span>Pins</span>
-          <div>
-            {Array.from({ length: 9 }, (_, index) => index + 1).map((pins) => {
-              const available = numericPins.includes(pins)
-              return <button className={!available ? 'unavailable' : ''} disabled={!available} key={pins} onClick={() => onRoll(pins)}>{pins}</button>
-            })}
-          </div>
-        </div>
-      </section>
-       <RecentFrames player={player} playerIndex={game.currentPlayer} onEdit={onEdit} />
       <button className="abandon-game-button" onClick={onAbandon}>Abandon game</button>
     </div>
   )
 }
 
-function ScorecardMode({ game, history, onSelectGame, onDelete, onEdit, isArchiveView = false, onBackHome }: {
+function ScorecardMode({ game, history, onSelectGame, onDelete, onEdit, isArchiveView = false }: {
   game: Game
   history: Game[]
   onSelectGame: (id: string | null) => void
   onDelete: (id: string) => void
   onEdit?: (playerIndex: number, frameIndex: number) => void
   isArchiveView?: boolean
-  onBackHome?: () => void
 }) {
   return (
     <div className={`score-mode ${isArchiveView ? 'archive-score-mode' : ''}`}>
-      {isArchiveView && onBackHome && <button className="archive-back-button" onClick={onBackHome}>← Back</button>}
       <section className="score-heading">
         <div>
           <h1>{formatDate(game.completedAt ?? game.createdAt)}</h1>
@@ -415,7 +406,6 @@ function formatDate(date: string): string {
 
 export default function App() {
   const [data, setData] = useState<AppData>(loadData)
-  const [view, setView] = useState<View>('entry')
   const [page, setPage] = useState<Page>(() => window.location.pathname === '/about' ? 'about' : 'app')
   const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null)
   const [editingFrame, setEditingFrame] = useState<{ playerIndex: number, frameIndex: number } | null>(null)
@@ -438,12 +428,11 @@ export default function App() {
 
   useEffect(() => {
     window.scrollTo(0, 0)
-  }, [page, view, selectedHistoryId])
+  }, [page, selectedHistoryId])
 
   const startGame = (names: string[]) => {
     setData((current) => ({ ...current, activeGame: createGame(names) }))
     setSelectedHistoryId(null)
-    setView('entry')
   }
 
   const addRoll = (pins: number) => {
@@ -494,7 +483,6 @@ export default function App() {
       lastPlayers: activeGame?.players.map((player) => player.name) ?? current.lastPlayers,
     }))
     setSelectedHistoryId(null)
-    setView('entry')
   }
 
   const abandonGame = () => {
@@ -506,13 +494,11 @@ export default function App() {
       lastPlayers: current.lastPlayers,
     }))
     setSelectedHistoryId(null)
-    setView('entry')
   }
 
   const goHome = () => {
     if (!activeGame) {
       setSelectedHistoryId(null)
-      setView('entry')
       return
     }
     const shouldAbandon = activeGame.status === 'active'
@@ -526,7 +512,6 @@ export default function App() {
       lastPlayers: current.lastPlayers,
     }))
     setSelectedHistoryId(null)
-    setView('entry')
   }
 
   const deleteGame = (id: string) => {
@@ -541,7 +526,6 @@ export default function App() {
 
   const viewHistory = (id: string) => {
     setSelectedHistoryId(id)
-    setView('scorecard')
   }
 
   const navigate = (nextPage: Page) => {
@@ -550,47 +534,35 @@ export default function App() {
     setPage(nextPage)
   }
 
-  const activeEntry = activeGame?.status === 'active' && !selectedHistoryId && view === 'entry'
-  const scorecardScreen = page === 'app' && (view === 'scorecard' || !!selectedHistoryId || activeGame?.status === 'completed')
   const toggleTheme = () => {
     setData((current) => ({
       ...current,
-      theme: (current.theme ?? 'light') === 'light' ? 'dark' : 'light',
+      theme: (current.theme ?? 'dark') === 'light' ? 'dark' : 'light',
     }))
   }
 
+  const backFromHeader = page === 'about'
+    ? () => navigate('app')
+    : () => { setSelectedHistoryId(null) }
+
   return (
-    <div className="app-shell" data-theme={data.theme ?? 'light'}>
+    <div className="app-shell" data-theme={data.theme ?? 'dark'}>
       <header className="site-header">
+        <div className="header-leading">
+          {(page === 'about' || selectedHistoryId) ? <button className="header-back" aria-label="Back" onClick={backFromHeader}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 5-7 7 7 7" /></svg>
+          </button> : <span aria-hidden="true" />}
+        </div>
         <button className="brand" onClick={page === 'about' ? () => navigate('app') : goHome} aria-label="spare me home">
           <Wordmark />
         </button>
-        <div className="header-actions">
-          {(page !== 'app' || !activeEntry) && !scorecardScreen && <button className="theme-toggle" aria-label={`Switch to ${data.theme === 'dark' ? 'light' : 'dark'} mode`} aria-pressed={data.theme === 'dark'} onClick={toggleTheme}>
-            <span className="theme-track-icons" aria-hidden="true">
-              <svg className="sun-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.5" /><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.28 5.28 6.7 6.7M17.3 17.3l1.42 1.42M5.28 18.72 6.7 17.3M17.3 6.7l1.42-1.42" /></svg>
-              <svg className="moon-icon" viewBox="0 0 24 24"><path d="M18.8 15.9A7.8 7.8 0 0 1 8.1 5.2a7.8 7.8 0 1 0 10.7 10.7Z" /><path className="moon-star" d="m17.8 4 .45 1.05 1.05.45-1.05.45L17.8 7l-.45-1.05-1.05-.45 1.05-.45L17.8 4Z" /></svg>
-            </span>
-            <span className="theme-thumb" aria-hidden="true">
-              <svg className="thumb-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.5" /><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.28 5.28 6.7 6.7M17.3 17.3l1.42 1.42M5.28 18.72 6.7 17.3M17.3 6.7l1.42-1.42" /></svg>
-              <svg className="thumb-moon" viewBox="0 0 24 24"><path d="M18.8 15.9A7.8 7.8 0 0 1 8.1 5.2a7.8 7.8 0 1 0 10.7 10.7Z" /><path className="moon-star" d="m17.8 4 .45 1.05 1.05.45-1.05.45L17.8 7l-.45-1.05-1.05-.45 1.05-.45L17.8 4Z" /></svg>
-            </span>
-          </button>}
-          {page === 'app' && (activeGame || selectedHistoryId) && (
-            <>
-              {activeGame && <nav className="view-switcher" aria-label="Game view">
-                <button className={view === 'entry' && !selectedHistoryId ? 'active' : ''} disabled={activeGame.status === 'completed'} onClick={() => { setSelectedHistoryId(null); setView('entry') }}>Enter scores</button>
-                <button className={view === 'scorecard' || !!selectedHistoryId ? 'active' : ''} onClick={() => { setSelectedHistoryId(null); setView('scorecard') }}>Scorecard</button>
-              </nav>}
-            </>
-          )}
-        </div>
+        <div className="header-actions" />
       </header>
 
       {page === 'about' ? (
-        <AboutPage onHome={() => navigate('app')} />
+        <AboutPage />
       ) : selectedHistoryId && displayedGame ? (
-        <main className="content"><ScorecardMode game={displayedGame} history={data.history} onSelectGame={setSelectedHistoryId} onDelete={deleteGame} isArchiveView onBackHome={() => { setSelectedHistoryId(null); setView('entry') }} /></main>
+        <main className="content"><ScorecardMode game={displayedGame} history={data.history} onSelectGame={setSelectedHistoryId} onDelete={deleteGame} isArchiveView /></main>
       ) : !activeGame ? (
         <Setup history={data.history} initialNames={data.lastPlayers} onStart={startGame} onViewHistory={viewHistory} />
       ) : activeGame.status === 'completed' && !selectedHistoryId ? (
@@ -598,13 +570,11 @@ export default function App() {
           <div className="complete-banner"><span>Game complete</span><button className="button primary" onClick={newGame}>Start another →</button></div>
           <ScorecardMode game={activeGame} history={data.history} onSelectGame={setSelectedHistoryId} onDelete={deleteGame} onEdit={(playerIndex, frameIndex) => setEditingFrame({ playerIndex, frameIndex })} />
         </main>
-      ) : displayedGame && view === 'scorecard' ? (
-        <main className="content"><ScorecardMode game={displayedGame} history={data.history} onSelectGame={setSelectedHistoryId} onDelete={deleteGame} onEdit={activeGame?.status === 'active' ? (playerIndex, frameIndex) => setEditingFrame({ playerIndex, frameIndex }) : undefined} /></main>
       ) : (
         <main className="content entry-content"><EntryMode game={activeGame} onRoll={addRoll} onUndo={undo} onAbandon={abandonGame} onEdit={(playerIndex, frameIndex) => setEditingFrame({ playerIndex, frameIndex })} /></main>
       )}
       {editingFrame && activeGame?.status === 'active' && <FrameEditor game={activeGame} playerIndex={editingFrame.playerIndex} frameIndex={editingFrame.frameIndex} onSave={saveFrameEdit} onClose={() => setEditingFrame(null)} />}
-      <SiteFooter onHome={() => navigate('app')} onAbout={() => navigate('about')} />
+      <SiteFooter onAbout={() => navigate('about')} theme={data.theme ?? 'dark'} onToggleTheme={toggleTheme} />
     </div>
   )
 }

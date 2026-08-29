@@ -29,7 +29,7 @@ function brandAssets() {
 export default defineConfig({
   plugins: [brandAssets(), react()],
   server: {
-    port: 3000,
+    port: 3333,
     allowedHosts: ['testlab.walleye-koi.ts.net'],
   },
   test: {

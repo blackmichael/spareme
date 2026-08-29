@@ -65,7 +65,6 @@ describe('score entry flow', () => {
     await user.type(screen.getByLabelText('Player 1 name'), 'Ada')
     await user.click(screen.getByRole('button', { name: /start bowling/i }))
     await user.click(screen.getByRole('button', { name: /strike/i }))
-    await user.click(screen.getByRole('button', { name: 'Scorecard' }))
     await user.click(screen.getByRole('button', { name: /edit Ada, frame 1/i }))
 
     const dialog = screen.getByRole('dialog')
@@ -86,7 +85,8 @@ describe('score entry flow', () => {
     await user.type(screen.getByLabelText('Player 1 name'), 'Ada')
     await user.type(screen.getByLabelText('Player 2 name'), 'Grace')
     await user.click(screen.getByRole('button', { name: /start bowling/i }))
-    await user.click(screen.getByRole('button', { name: 'Scorecard' }))
+    expect(screen.queryByRole('button', { name: 'Enter scores' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Scorecard' })).not.toBeInTheDocument()
 
     expect(screen.getByRole('table', { name: 'Bowling scorecard' })).toBeInTheDocument()
     expect(screen.getByRole('rowheader', { name: /Ada/ })).toBeInTheDocument()
@@ -187,13 +187,13 @@ describe('score entry flow', () => {
     const user = userEvent.setup()
     const rendered = render(<App />)
 
-    expect(screen.getByRole('button', { name: /switch to dark mode/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /spare me home/i }).closest('.app-shell')).toHaveAttribute('data-theme', 'light')
-
-    await user.click(screen.getByRole('button', { name: /switch to dark mode/i }))
     expect(screen.getByRole('button', { name: /switch to light mode/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /spare me home/i }).closest('.app-shell')).toHaveAttribute('data-theme', 'dark')
-    expect(localStorage.getItem('lane-ten:v1')).toContain('"theme":"dark"')
+
+    await user.click(screen.getByRole('button', { name: /switch to light mode/i }))
+    expect(screen.getByRole('button', { name: /switch to dark mode/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /spare me home/i }).closest('.app-shell')).toHaveAttribute('data-theme', 'light')
+    expect(localStorage.getItem('lane-ten:v1')).toContain('"theme":"light"')
 
     await user.type(screen.getByLabelText('Player 1 name'), 'Ada')
     await user.click(screen.getByRole('button', { name: /start bowling/i }))
@@ -202,19 +202,21 @@ describe('score entry flow', () => {
     await user.click(screen.getByRole('button', { name: /spare me home/i }))
     rendered.unmount()
     render(<App />)
-    expect(screen.getByRole('button', { name: /switch to light mode/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /switch to dark mode/i })).toBeInTheDocument()
   })
 
   it('opens the about page from the footer and returns home', async () => {
     const user = userEvent.setup()
     render(<App />)
 
+    expect(screen.getByText('© 2026 Spare Me. All rights reserved.')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /source code/i })).toHaveAttribute('href', 'https://github.com/blackmichael/spareme')
     await user.click(screen.getByRole('link', { name: 'About' }))
     expect(screen.getByRole('heading', { name: /a better way to keep score/i })).toBeInTheDocument()
     expect(window.location.pathname).toBe('/about')
     expect(document.title).toBe('About | spare me')
 
-    await user.click(screen.getByRole('button', { name: /^← back$/i }))
+    await user.click(screen.getByRole('button', { name: 'Back' }))
     expect(screen.getByRole('heading', { name: "Who's bowling?" })).toBeInTheDocument()
     expect(window.location.pathname).toBe('/')
   })
@@ -229,7 +231,7 @@ describe('score entry flow', () => {
     fireEvent(window, new PopStateEvent('popstate'))
 
     expect(screen.getByRole('heading', { name: /a better way to keep score/i })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: /^← back$/i }))
+    await user.click(screen.getByRole('button', { name: 'Back' }))
     expect(screen.getByText('Now bowling')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Ada' })).toBeInTheDocument()
   })
