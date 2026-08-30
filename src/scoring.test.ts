@@ -6,6 +6,12 @@ function rollMany(game: Game, rolls: number[]): Game {
 }
 
 describe('bowling scoring', () => {
+  it('creates short URL-safe game IDs', () => {
+    const game = createGame(['Ada'])
+
+    expect(game.id).toMatch(/^[0-9a-z]{16}$/)
+  })
+
   it('scores a perfect game', () => {
     const game = rollMany(createGame(['Ada']), Array(12).fill(10))
     expect(game.status).toBe('completed')

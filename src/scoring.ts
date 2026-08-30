@@ -1,9 +1,10 @@
 import type { Frame, Game, Player } from './types'
+import xid from 'xid'
 
 export function createGame(names: string[]): Game {
   const createdAt = new Date().toISOString()
   return {
-    id: crypto.randomUUID(),
+    id: xid.generateId(),
     createdAt,
     players: names.map((name, index) => ({
       id: crypto.randomUUID(),

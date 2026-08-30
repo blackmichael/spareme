@@ -22,7 +22,8 @@
     "@vitejs/plugin-react": "latest",
     "react": "latest",
     "react-dom": "latest",
-    "vite": "latest"
+    "vite": "latest",
+    "xid": "^0.0.2"
   },
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2",

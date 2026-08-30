@@ -4,7 +4,34 @@ import { loadData, saveData } from './storage'
 import type { AppData, Frame, Game } from './types'
 import { Wordmark } from './brand/Wordmark'
 
-type Page = 'app' | 'about'
+type Route =
+  | { kind: 'home' }
+  | { kind: 'about' }
+  | { kind: 'game' }
+  | { kind: 'history', id: string }
+  | { kind: 'not-found' }
+
+function parseRoute(pathname: string): Route {
+  if (pathname === '/') return { kind: 'home' }
+  if (pathname === '/about') return { kind: 'about' }
+  if (pathname === '/game') return { kind: 'game' }
+  const match = pathname.match(/^\/games\/([^/]+)$/)
+  if (match) {
+    try {
+      return { kind: 'history', id: decodeURIComponent(match[1]) }
+    } catch {
+      return { kind: 'not-found' }
+    }
+  }
+  return { kind: 'not-found' }
+}
+
+function routePath(route: Route): string {
+  if (route.kind === 'about') return '/about'
+  if (route.kind === 'game') return '/game'
+  if (route.kind === 'history') return `/games/${encodeURIComponent(route.id)}`
+  return '/'
+}
 
 function AboutPage() {
   return (
@@ -34,6 +61,23 @@ function AboutPage() {
       <section className="about-note">
         <strong>Perfect game: 300</strong>
         <span>A perfect game requires 10 strikes and 2 bonus strikes in the tenth frame.</span>
+      </section>
+    </main>
+  )
+}
+
+function NotFoundPage({ game }: { game: boolean }) {
+  return (
+    <main className="not-found-page content">
+      <section className="not-found-card panel">
+        <p className="eyebrow">Gutter ball</p>
+        <h1>{game ? 'Game not found' : 'Page not found'}</h1>
+        <p className="not-found-copy">
+          {game
+            ? 'This game isn’t available on this device. spare me stores games locally, so sharing its URL doesn’t share the score. Open it on the device where you played, or return home to start a new game.'
+            : 'That page request went straight into the gutter. Check the web address or return home.'}
+        </p>
+        <a className="button primary not-found-action" href="/">Back home <span>→</span></a>
       </section>
     </main>
   )
@@ -452,41 +496,58 @@ function formatDate(date: string): string {
 
 export default function App() {
   const [data, setData] = useState<AppData>(loadData)
-  const [page, setPage] = useState<Page>(() => window.location.pathname === '/about' ? 'about' : 'app')
-  const [showSetup, setShowSetup] = useState(false)
-  const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null)
+  const [route, setRoute] = useState<Route>(() => parseRoute(window.location.pathname))
   const [editingFrame, setEditingFrame] = useState<{ playerIndex: number, frameIndex: number } | null>(null)
   const activeGame = data.activeGame
-  const displayedGame = selectedHistoryId
-    ? data.history.find((game) => game.id === selectedHistoryId) ?? activeGame
-    : activeGame
+  const selectedHistoryId = route.kind === 'history' ? route.id : null
+  const displayedGame = selectedHistoryId ? data.history.find((game) => game.id === selectedHistoryId) : activeGame
 
   useEffect(() => saveData(data), [data])
 
   useEffect(() => {
-    const onPopState = () => setPage(window.location.pathname === '/about' ? 'about' : 'app')
+    const onPopState = () => setRoute(parseRoute(window.location.pathname))
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
   }, [])
 
   useEffect(() => {
-    document.title = page === 'about' ? 'About | spare me' : 'spare me'
-  }, [page])
+    const title = route.kind === 'about'
+      ? 'About | spare me'
+      : route.kind === 'not-found'
+        ? 'Page not found | spare me'
+        : route.kind === 'history' && !displayedGame
+          ? 'Game not found | spare me'
+          : 'spare me'
+    document.title = title
+  }, [route.kind, displayedGame])
 
   useEffect(() => {
     window.scrollTo(0, 0)
-  }, [page, selectedHistoryId])
+  }, [route])
+
+  useEffect(() => {
+    if (route.kind !== 'game' || activeGame?.status === 'active') return
+    window.history.replaceState({}, '', '/')
+    setRoute({ kind: 'home' })
+  }, [activeGame?.status, route.kind])
+
+  const navigate = (nextRoute: Route, replace = false) => {
+    const path = routePath(nextRoute)
+    if (replace) window.history.replaceState({}, '', path)
+    else window.history.pushState({}, '', path)
+    setRoute(nextRoute)
+  }
 
   const startGame = (names: string[]) => {
     setData((current) => ({ ...current, activeGame: createGame(names) }))
-    setSelectedHistoryId(null)
-    setShowSetup(false)
+    navigate({ kind: 'game' })
   }
 
   const addRoll = (pins: number) => {
+    if (!activeGame) return
+    const updated = recordRoll(activeGame, pins)
     setData((current) => {
-      if (!current.activeGame) return current
-      const updated = recordRoll(current.activeGame, pins)
+      if (!current.activeGame || current.activeGame.id !== activeGame.id) return current
       const justCompleted = current.activeGame.status === 'active' && updated.status === 'completed'
       return {
         ...current,
@@ -495,6 +556,7 @@ export default function App() {
         lastPlayers: justCompleted ? updated.players.map((player) => player.name) : current.lastPlayers,
       }
     })
+    if (updated.status === 'completed') navigate({ kind: 'history', id: updated.id })
   }
 
   const undo = () => {
@@ -506,10 +568,11 @@ export default function App() {
   }
 
   const saveFrameEdit = (playerIndex: number, frameIndex: number, frame: Frame) => {
+    if (!activeGame) return
+    const updated = replaceFrame(activeGame, playerIndex, frameIndex, frame)
+    if (updated === activeGame) return
     setData((current) => {
-      if (!current.activeGame) return current
-      const updated = replaceFrame(current.activeGame, playerIndex, frameIndex, frame)
-      if (updated === current.activeGame) return current
+      if (!current.activeGame || current.activeGame.id !== activeGame.id) return current
       const justCompleted = current.activeGame.status === 'active' && updated.status === 'completed'
       return {
         ...current,
@@ -521,6 +584,7 @@ export default function App() {
       }
     })
     setEditingFrame(null)
+    if (updated.status === 'completed') navigate({ kind: 'history', id: updated.id })
   }
 
   const newGame = () => {
@@ -530,8 +594,7 @@ export default function App() {
       activeGame: null,
       lastPlayers: activeGame?.players.map((player) => player.name) ?? current.lastPlayers,
     }))
-    setSelectedHistoryId(null)
-    setShowSetup(true)
+    navigate({ kind: 'home' })
   }
 
   const abandonGame = () => {
@@ -542,13 +605,11 @@ export default function App() {
       history: current.history.filter((game) => game.id !== activeGame.id),
       lastPlayers: current.lastPlayers,
     }))
-    setSelectedHistoryId(null)
-    setShowSetup(true)
+    navigate({ kind: 'home' })
   }
 
   const goHome = () => {
-    setSelectedHistoryId(null)
-    setShowSetup(true)
+    navigate({ kind: 'home' })
   }
 
   const deleteGame = (id: string) => {
@@ -558,17 +619,16 @@ export default function App() {
       activeGame: current.activeGame?.id === id ? null : current.activeGame,
       history: current.history.filter((game) => game.id !== id),
     }))
-    setSelectedHistoryId(null)
+    navigate({ kind: 'home' })
   }
 
   const viewHistory = (id: string) => {
-    setSelectedHistoryId(id)
+    navigate({ kind: 'history', id })
   }
 
-  const navigate = (nextPage: Page) => {
-    const path = nextPage === 'about' ? '/about' : '/'
-    window.history.pushState({}, '', path)
-    setPage(nextPage)
+  const selectHistory = (id: string | null) => {
+    if (id) viewHistory(id)
+    else navigate({ kind: 'home' })
   }
 
   const toggleTheme = () => {
@@ -578,40 +638,46 @@ export default function App() {
     }))
   }
 
-  const backFromHeader = page === 'about'
-    ? () => navigate('app')
-    : () => { setSelectedHistoryId(null) }
+  const backFromHeader = () => window.history.back()
+
+  const isCurrentCompletedGame = route.kind === 'history'
+    && activeGame?.status === 'completed'
+    && displayedGame?.id === activeGame.id
 
   return (
     <div className="app-shell" data-theme={data.theme ?? 'dark'}>
       <header className="site-header">
         <div className="header-leading">
-          {(page === 'about' || selectedHistoryId) ? <button className="header-back" aria-label="Back" onClick={backFromHeader}>
+          {(route.kind === 'about' || selectedHistoryId) ? <button className="header-back" aria-label="Back" onClick={backFromHeader}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 5-7 7 7 7" /></svg>
           </button> : <span aria-hidden="true" />}
         </div>
-        <button className="brand" onClick={page === 'about' ? () => navigate('app') : goHome} aria-label="spare me home">
+        <button className="brand" onClick={goHome} aria-label="spare me home">
           <Wordmark />
         </button>
         <div className="header-actions" />
       </header>
 
-      {page === 'about' ? (
+      {route.kind === 'about' ? (
         <AboutPage />
-      ) : selectedHistoryId && displayedGame ? (
-        <main className="content"><ScorecardMode game={displayedGame} history={data.history} onSelectGame={setSelectedHistoryId} onDelete={deleteGame} isArchiveView /></main>
-      ) : !activeGame || showSetup ? (
-        <Setup history={data.history} activeGame={activeGame} initialNames={data.lastPlayers} onStart={startGame} onResume={() => setShowSetup(false)} onAbandon={abandonGame} onViewHistory={viewHistory} />
-      ) : activeGame.status === 'completed' && !selectedHistoryId ? (
+      ) : route.kind === 'not-found' ? (
+        <NotFoundPage game={false} />
+      ) : route.kind === 'history' && displayedGame ? (
         <main className="content">
-          <div className="complete-banner"><span>Game complete</span><button className="button primary" onClick={newGame}>Start another →</button></div>
-          <ScorecardMode game={activeGame} history={data.history} onSelectGame={setSelectedHistoryId} onDelete={deleteGame} onEdit={(playerIndex, frameIndex) => setEditingFrame({ playerIndex, frameIndex })} />
+          {isCurrentCompletedGame && <div className="complete-banner"><span>Game complete</span><button className="button primary" onClick={newGame}>Start another →</button></div>}
+          <ScorecardMode game={displayedGame} history={data.history} onSelectGame={selectHistory} onDelete={deleteGame} onEdit={isCurrentCompletedGame ? (playerIndex, frameIndex) => setEditingFrame({ playerIndex, frameIndex }) : undefined} isArchiveView={!isCurrentCompletedGame} />
         </main>
-      ) : (
+      ) : route.kind === 'history' ? (
+        <NotFoundPage game />
+      ) : route.kind === 'home' ? (
+        <Setup history={data.history} activeGame={activeGame} initialNames={data.lastPlayers} onStart={startGame} onResume={() => navigate({ kind: 'game' })} onAbandon={abandonGame} onViewHistory={viewHistory} />
+      ) : route.kind === 'game' && activeGame?.status === 'active' ? (
         <main className="content entry-content"><EntryMode game={activeGame} onRoll={addRoll} onUndo={undo} onAbandon={abandonGame} onEdit={(playerIndex, frameIndex) => setEditingFrame({ playerIndex, frameIndex })} /></main>
+      ) : (
+        <Setup history={data.history} activeGame={activeGame} initialNames={data.lastPlayers} onStart={startGame} onResume={() => navigate({ kind: 'game' })} onAbandon={abandonGame} onViewHistory={viewHistory} />
       )}
       {editingFrame && activeGame?.status === 'active' && <FrameEditor game={activeGame} playerIndex={editingFrame.playerIndex} frameIndex={editingFrame.frameIndex} onSave={saveFrameEdit} onClose={() => setEditingFrame(null)} />}
-      <SiteFooter onAbout={() => navigate('about')} theme={data.theme ?? 'dark'} onToggleTheme={toggleTheme} />
+      <SiteFooter onAbout={() => navigate({ kind: 'about' })} theme={data.theme ?? 'dark'} onToggleTheme={toggleTheme} />
     </div>
   )
 }

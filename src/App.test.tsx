@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import App from './App'
 
@@ -14,6 +14,7 @@ describe('score entry flow', () => {
 
     await user.type(screen.getByLabelText('Player 1 name'), 'Ada')
     await user.click(screen.getByRole('button', { name: /start bowling/i }))
+    expect(window.location.pathname).toBe('/game')
     expect(screen.getByText('Now bowling')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Ada' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /new game/i })).not.toBeInTheDocument()
@@ -115,6 +116,7 @@ describe('score entry flow', () => {
     for (let roll = 0; roll < 20; roll += 1) {
       await user.click(screen.getByRole('button', { name: /miss/i }))
     }
+    expect(window.location.pathname).toMatch(/^\/games\/.+/)
     await user.click(screen.getByRole('button', { name: /start another/i }))
 
     expect(screen.getByLabelText('Player 1 name')).toHaveValue('')
@@ -236,6 +238,36 @@ describe('score entry flow', () => {
     await user.click(screen.getByRole('button', { name: 'Back' }))
     expect(screen.getByRole('heading', { name: "Who's bowling?" })).toBeInTheDocument()
     expect(window.location.pathname).toBe('/')
+  })
+
+  it('renders separate explanations for unknown pages and missing games', async () => {
+    render(<App />)
+
+    window.history.pushState({}, '', '/missing-page')
+    fireEvent(window, new PopStateEvent('popstate'))
+    expect(screen.getByRole('heading', { name: 'Page not found' })).toBeInTheDocument()
+    expect(screen.getByText(/page request went straight into the gutter/i)).toBeInTheDocument()
+
+    window.history.pushState({}, '', '/games/missing-game')
+    fireEvent(window, new PopStateEvent('popstate'))
+    expect(screen.getByRole('heading', { name: 'Game not found' })).toBeInTheDocument()
+    expect(screen.getByText(/stores games locally/i)).toBeInTheDocument()
+  })
+
+  it('restores the previous screen when the browser goes back', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.type(screen.getByLabelText('Player 1 name'), 'Ada')
+    await user.click(screen.getByRole('button', { name: /start bowling/i }))
+    await user.click(screen.getByRole('button', { name: /spare me home/i }))
+    expect(window.location.pathname).toBe('/')
+
+    window.history.back()
+    await waitFor(() => {
+      expect(window.location.pathname).toBe('/game')
+      expect(screen.getByText('Now bowling')).toBeInTheDocument()
+    })
   })
 
   it('preserves an active game while browsing about', async () => {
