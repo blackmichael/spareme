@@ -162,7 +162,7 @@ describe('score entry flow', () => {
     await user.type(firstPlayer, 'Ada')
     await user.keyboard('{Enter}')
 
-    expect(screen.getByLabelText('Player 2 name')).toBeInTheDocument()
+    expect(screen.getByLabelText('Player 2 name')).toHaveFocus()
     expect(screen.getByDisplayValue('Ada')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: "Who's bowling?" })).toBeInTheDocument()
   })

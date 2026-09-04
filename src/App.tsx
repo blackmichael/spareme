@@ -126,13 +126,23 @@ function Setup({ history, activeGame, onStart, onResume, onAbandon, onViewHistor
   initialNames?: string[]
 }) {
   const [names, setNames] = useState([''])
+  const nameInputRefs = useRef<Array<HTMLInputElement | null>>([])
+  const pendingFocusIndex = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (pendingFocusIndex.current === null) return
+    nameInputRefs.current[pendingFocusIndex.current]?.focus()
+    pendingFocusIndex.current = null
+  }, [names.length])
 
   const updateName = (index: number, value: string) => {
     setNames((current) => current.map((name, i) => i === index ? value : name))
   }
 
-  const addPlayer = () => {
-    if (names.length < 10) setNames([...names, ''])
+  const addPlayer = (focusNewPlayer = false) => {
+    if (names.length >= 10) return
+    if (focusNewPlayer) pendingFocusIndex.current = names.length
+    setNames([...names, ''])
   }
 
   const start = () => {
@@ -189,9 +199,10 @@ function Setup({ history, activeGame, onStart, onResume, onAbandon, onViewHistor
                     onKeyDown={(event) => {
                       if (event.key !== 'Enter') return
                       event.preventDefault()
-                      addPlayer()
+                      addPlayer(true)
                     }}
                     placeholder={`Player ${index + 1}`}
+                    ref={(element) => { nameInputRefs.current[index] = element }}
                     value={name}
                   />
                   {names.length > 1 && (
@@ -201,7 +212,7 @@ function Setup({ history, activeGame, onStart, onResume, onAbandon, onViewHistor
               ))}
             </div>
             <div className="setup-actions">
-              <button className="button secondary" disabled={names.length >= 10} onClick={addPlayer}>+ Add player</button>
+              <button className="button secondary" disabled={names.length >= 10} onClick={() => addPlayer()}>+ Add player</button>
               <button className="button primary" onClick={start}>Start bowling <span>→</span></button>
             </div>
           </>
