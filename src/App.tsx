@@ -35,7 +35,7 @@ function routePath(route: Route): string {
 
 function AboutPage() {
   return (
-    <main className="about-page content">
+    <main id="main-content" className="about-page content">
       <section className="about-hero">
         <h1 aria-label="A better way to keep score.">A better way<br />to keep score.</h1>
         <p className="lede">spare me tracks your bowling scores so you can focus on the pins.</p>
@@ -68,7 +68,7 @@ function AboutPage() {
 
 function NotFoundPage({ game }: { game: boolean }) {
   return (
-    <main className="not-found-page content">
+    <main id="main-content" className="not-found-page content">
       <section className="not-found-card panel">
         <p className="eyebrow">Gutter ball</p>
         <h1>{game ? 'Game not found' : 'Page not found'}</h1>
@@ -141,8 +141,8 @@ function Setup({ history, activeGame, onStart, onResume, onAbandon, onViewHistor
   }
 
   return (
-    <main className="setup-layout">
-      <section className="setup-card panel">
+    <main id="main-content" className="setup-layout">
+       <section className="setup-card panel">
         <div className="setup-intro">
           <h1>{activeGame?.status === 'active' ? 'Back to bowling' : "Who's bowling?"}</h1>
           {activeGame?.status !== 'active' ? (
@@ -182,7 +182,9 @@ function Setup({ history, activeGame, onStart, onResume, onAbandon, onViewHistor
                   <span className="player-number">{String(index + 1).padStart(2, '0')}</span>
                   <input
                     aria-label={`Player ${index + 1} name`}
+                    autoComplete="off"
                     maxLength={24}
+                    name={`playerName${index + 1}`}
                     onChange={(event) => updateName(index, event.target.value)}
                     onKeyDown={(event) => {
                       if (event.key !== 'Enter') return
@@ -312,8 +314,11 @@ function FrameEditor({ game, playerIndex, frameIndex, onSave, onClose }: {
 }
 
 function Scorecard({ game, onEdit }: { game: Game, onEdit?: (playerIndex: number, frameIndex: number) => void }) {
+  const [expanded, setExpanded] = useState(false)
   const scorecardWrapRef = useRef<HTMLDivElement>(null)
   const activeFrameRef = useRef<HTMLTableCellElement>(null)
+  const canCollapse = game.status === 'active' && game.players.length > 3
+  const isCollapsed = canCollapse && !expanded
 
   useEffect(() => {
     if (game.status !== 'active' || !activeFrameRef.current || !scorecardWrapRef.current) return
@@ -324,18 +329,45 @@ function Scorecard({ game, onEdit }: { game: Game, onEdit?: (playerIndex: number
     const reservedWidth = bowlerColumn?.offsetWidth ?? 0
     const visibleWidth = container.clientWidth - reservedWidth
     const targetScrollLeft = activeFrame.offsetLeft - reservedWidth - (visibleWidth - activeFrame.offsetWidth) / 2
+    const activeRow = activeFrame.closest('tr')
+    const tableHead = container.querySelector<HTMLElement>('thead')
     const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
     const left = Math.max(0, targetScrollLeft)
+    const viewportPadding = 16
+    let top = container.scrollTop
+
+    if (activeRow) {
+      const rowBounds = activeRow.getBoundingClientRect()
+      const containerBounds = container.getBoundingClientRect()
+      const viewportTop = containerBounds.top + (tableHead?.offsetHeight ?? 0) + viewportPadding
+      const viewportBottom = containerBounds.bottom - viewportPadding
+      const verticalDelta = rowBounds.top < viewportTop
+        ? rowBounds.top - viewportTop
+        : rowBounds.bottom > viewportBottom
+          ? rowBounds.bottom - viewportBottom
+          : 0
+      top = Math.max(0, container.scrollTop + verticalDelta)
+    }
 
     if (typeof container.scrollTo === 'function') {
-      container.scrollTo({ left, behavior: reduceMotion ? 'auto' : 'smooth' })
+      container.scrollTo({ left, top, behavior: reduceMotion ? 'auto' : 'smooth' })
     } else {
       container.scrollLeft = left
+      container.scrollTop = top
     }
-  }, [game.status, game.currentFrame])
+  }, [expanded, game.status, game.currentFrame, game.currentPlayer])
 
   return (
-    <div className="scorecard-wrap" ref={scorecardWrapRef}>
+    <div className="scorecard-block">
+      {canCollapse && (
+        <div className="scorecard-toolbar">
+          <span className="eyebrow">Scorecard</span>
+          <button className="text-button" aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>
+            {expanded ? 'Show fewer players' : 'Show all players'}
+          </button>
+        </div>
+      )}
+      <div className={`scorecard-wrap${isCollapsed ? ' is-collapsed' : ''}`} ref={scorecardWrapRef}>
       <table className="scorecard">
         <caption className="sr-only">Bowling scorecard</caption>
         <thead>
@@ -364,6 +396,7 @@ function Scorecard({ game, onEdit }: { game: Game, onEdit?: (playerIndex: number
           })}
         </tbody>
       </table>
+      </div>
     </div>
   )
 }
@@ -374,16 +407,15 @@ function EntryMode({ game, onRoll, onUndo, onAbandon, onEdit }: { game: Game, on
   const maxPins = maxPinsForFrame(frame, game.currentFrame)
   const strikeAvailable = frame.length === 0 || (game.currentFrame === 9 && frame.length > 0 && (frame[0] === 10 || frame.length === 2))
   const showStrike = strikeAvailable && maxPins === 10
-  const nextPlayer = game.currentPlayer < game.players.length - 1
-    ? game.players[game.currentPlayer + 1]
-    : game.currentFrame < 9 ? game.players[0] : null
-  const numericPins = Array.from({ length: Math.max(0, maxPins - 1) }, (_, index) => index + 1)
+  const numericPins = Array.from({ length: 9 }, (_, index) => index + 1)
+  const lastRoll = game.rollLog.at(-1)
+  const frameMarks = frame.map((_, index) => rollMark(frame, index, game.currentFrame)).join(' ')
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.metaKey || event.ctrlKey || event.altKey) return
       const target = event.target as HTMLElement
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return
+      if (target.closest('button, a, input, textarea, select, [contenteditable="true"]')) return
       const key = event.key.toLowerCase()
        if ((key === 'x' && showStrike) || (key === '/' && !showStrike && maxPins > 0)) onRoll(maxPins)
       else if (key === 'm' || key === '0') onRoll(0)
@@ -395,29 +427,24 @@ function EntryMode({ game, onRoll, onUndo, onAbandon, onEdit }: { game: Game, on
 
   return (
     <div className="entry-screen">
-      <div className="entry-controls">
-        <section className="now-bowling panel">
-          <div className="turn-meta">
-            <span>Frame {game.currentFrame + 1} <i>/ 10</i></span>
-            <span>Ball {frame.length + 1}</span>
-          </div>
-          <div className="current-player">
-            <p className="eyebrow">Now bowling</p>
-            <h1>{player.name}</h1>
-          </div>
-          <div className="next-up" aria-live="polite">
-            <span className="status-light" />
-            {nextPlayer ? <span>On deck <strong>{nextPlayer.name}</strong></span> : <strong>Final rolls</strong>}
-          </div>
-        </section>
-
-        <section className="pin-pad panel" aria-label="Record knocked down pins">
-          <div className="pin-pad-heading">
-            <div>
-              <p className="eyebrow">Record the roll</p>
-              <h2>What happened?</h2>
+      <div className="entry-primary">
+        <section className="entry-console panel" aria-label="Record knocked down pins">
+          <div className="turn-strip">
+            <div className="current-player">
+              <p className="eyebrow">Now bowling</p>
+              <h1 title={player.name}>{player.name}</h1>
             </div>
-            <button className="text-button undo-button" disabled={game.rollLog.length === 0} onClick={onUndo}>
+            <div className="turn-meta" aria-label={`Frame ${game.currentFrame + 1} of 10, ball ${frame.length + 1}`}>
+              <span>Frame <strong>{game.currentFrame + 1}</strong> <i>·</i> Ball <strong>{frame.length + 1}</strong></span>
+            </div>
+          </div>
+          <p className="sr-only" aria-live="polite">Frame {game.currentFrame + 1}, ball {frame.length + 1}. Now bowling {player.name}.</p>
+          <div className="turn-context">
+            <div className="frame-summary" aria-label={`This frame ${frameMarks || 'not started'}`}>
+              <span>This frame</span>
+              <strong>{frameMarks || '—'}</strong>
+            </div>
+            <button className="text-button undo-button" aria-label={lastRoll ? 'Undo last roll' : 'Undo'} disabled={game.rollLog.length === 0} onClick={onUndo}>
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="m9 14-5-5 5-5" />
                 <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
@@ -427,27 +454,27 @@ function EntryMode({ game, onRoll, onUndo, onAbandon, onEdit }: { game: Game, on
           </div>
           <div className="quick-outcomes">
             {showStrike ? (
-              <button className="outcome strike" aria-label="Strike" onClick={() => onRoll(10)}><strong aria-hidden="true">X</strong><span aria-hidden="true">Strike</span><kbd aria-hidden="true">X</kbd></button>
+              <button className="outcome strike" aria-label="Strike" onClick={() => onRoll(10)}><strong aria-hidden="true">X</strong><span aria-hidden="true">Strike</span></button>
             ) : (
-              <button className="outcome spare" aria-label="Spare" onClick={() => onRoll(maxPins)}><strong aria-hidden="true">/</strong><span aria-hidden="true">Spare</span><kbd aria-hidden="true">/</kbd></button>
+              <button className="outcome spare" aria-label="Spare" onClick={() => onRoll(maxPins)}><strong aria-hidden="true">/</strong><span aria-hidden="true">Spare</span></button>
             )}
-            <button className="outcome miss" aria-label="Miss" onClick={() => onRoll(0)}><strong aria-hidden="true">–</strong><span aria-hidden="true">Miss</span><kbd aria-hidden="true">0</kbd></button>
+            <button className="outcome miss" aria-label="Miss" onClick={() => onRoll(0)}><strong aria-hidden="true">–</strong><span aria-hidden="true">Miss</span></button>
           </div>
           <div className="pin-counts">
-            <span>Pins</span>
-            <div>
-              {Array.from({ length: 9 }, (_, index) => index + 1).map((pins) => {
-                const available = numericPins.includes(pins)
-                return <button className={!available ? 'unavailable' : ''} disabled={!available} key={pins} onClick={() => onRoll(pins)}>{pins}</button>
+            <span aria-label={`Pins left ${maxPins}`}>Pins left <strong>{maxPins}</strong></span>
+            <div className="pin-options">
+              {numericPins.map((pins) => {
+                const available = pins < maxPins
+                return <button aria-label={`${pins} pins`} className={available ? '' : 'unavailable'} disabled={!available} key={pins} onClick={() => onRoll(pins)}>{pins}</button>
               })}
             </div>
           </div>
         </section>
-      </div>
 
-      <section className="active-scorecard" aria-label="Bowling scorecard">
-        <Scorecard game={game} onEdit={onEdit} />
-      </section>
+        <section className="active-scorecard" aria-label="Bowling scorecard">
+          <Scorecard game={game} onEdit={onEdit} />
+        </section>
+      </div>
 
       <button className="abandon-game-button" onClick={onAbandon}>Abandon game</button>
     </div>
@@ -520,6 +547,10 @@ export default function App() {
           : 'spare me'
     document.title = title
   }, [route.kind, displayedGame])
+
+  useEffect(() => {
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', data.theme === 'light' ? '#f3ead8' : '#102628')
+  }, [data.theme])
 
   useEffect(() => {
     window.scrollTo(0, 0)
@@ -644,9 +675,10 @@ export default function App() {
     && activeGame?.status === 'completed'
     && displayedGame?.id === activeGame.id
 
-  return (
-    <div className="app-shell" data-theme={data.theme ?? 'dark'}>
-      <header className="site-header">
+   return (
+       <div className={`app-shell ${route.kind === 'game' ? 'game-shell' : ''}`} data-theme={data.theme ?? 'dark'}>
+       <a className="skip-link" href="#main-content">Skip to main content</a>
+       <header className="site-header">
         <div className="header-leading">
           {(route.kind === 'about' || selectedHistoryId) ? <button className="header-back" aria-label="Back" onClick={backFromHeader}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 5-7 7 7 7" /></svg>
@@ -663,7 +695,7 @@ export default function App() {
       ) : route.kind === 'not-found' ? (
         <NotFoundPage game={false} />
       ) : route.kind === 'history' && displayedGame ? (
-        <main className="content">
+        <main id="main-content" className="content">
           {isCurrentCompletedGame && <div className="complete-banner"><span>Game complete</span><button className="button primary" onClick={newGame}>Start another →</button></div>}
           <ScorecardMode game={displayedGame} history={data.history} onSelectGame={selectHistory} onDelete={deleteGame} onEdit={isCurrentCompletedGame ? (playerIndex, frameIndex) => setEditingFrame({ playerIndex, frameIndex }) : undefined} isArchiveView={!isCurrentCompletedGame} />
         </main>
@@ -672,7 +704,7 @@ export default function App() {
       ) : route.kind === 'home' ? (
         <Setup history={data.history} activeGame={activeGame} initialNames={data.lastPlayers} onStart={startGame} onResume={() => navigate({ kind: 'game' })} onAbandon={abandonGame} onViewHistory={viewHistory} />
       ) : route.kind === 'game' && activeGame?.status === 'active' ? (
-        <main className="content entry-content"><EntryMode game={activeGame} onRoll={addRoll} onUndo={undo} onAbandon={abandonGame} onEdit={(playerIndex, frameIndex) => setEditingFrame({ playerIndex, frameIndex })} /></main>
+        <main id="main-content" className="content entry-content"><EntryMode game={activeGame} onRoll={addRoll} onUndo={undo} onAbandon={abandonGame} onEdit={(playerIndex, frameIndex) => setEditingFrame({ playerIndex, frameIndex })} /></main>
       ) : (
         <Setup history={data.history} activeGame={activeGame} initialNames={data.lastPlayers} onStart={startGame} onResume={() => navigate({ kind: 'game' })} onAbandon={abandonGame} onViewHistory={viewHistory} />
       )}

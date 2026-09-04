@@ -20,8 +20,46 @@ describe('score entry flow', () => {
     expect(screen.queryByRole('button', { name: /new game/i })).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /strike/i }))
-    expect(screen.getByText('Frame 2', { exact: false })).toBeInTheDocument()
+    expect(screen.getByLabelText(/Frame 2 of 10/)).toBeInTheDocument()
     expect(localStorage.getItem('lane-ten:v1')).toContain('Ada')
+  })
+
+  it('keeps the current frame and remaining pins visible in the scoring console', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.type(screen.getByLabelText('Player 1 name'), 'Ada')
+    await user.click(screen.getByRole('button', { name: /start bowling/i }))
+    await user.click(screen.getByRole('button', { name: '7 pins' }))
+
+    expect(screen.getByLabelText('This frame 7')).toBeInTheDocument()
+    expect(screen.getByLabelText('Pins left 3')).toBeInTheDocument()
+  })
+
+  it('keeps keyboard shortcuts out of focused controls', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.type(screen.getByLabelText('Player 1 name'), 'Ada')
+    await user.click(screen.getByRole('button', { name: /start bowling/i }))
+    const onePinButton = screen.getByRole('button', { name: '1 pins' })
+    onePinButton.focus()
+    await user.keyboard('x')
+
+    expect(screen.getByLabelText(/Frame 1 of 10/)).toBeInTheDocument()
+  })
+
+  it('shows only valid numeric pin choices', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.type(screen.getByLabelText('Player 1 name'), 'Ada')
+    await user.click(screen.getByRole('button', { name: /start bowling/i }))
+    await user.click(screen.getByRole('button', { name: '7 pins' }))
+
+    expect(screen.getByRole('button', { name: '1 pins' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '2 pins' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '3 pins' })).toBeDisabled()
   })
 
   it('treats ten pins after a first-roll miss as a spare', async () => {
@@ -55,7 +93,7 @@ describe('score entry flow', () => {
     await user.click(within(rollSections[1] as HTMLElement).getByRole('button', { name: 'Spare' }))
     await user.click(screen.getByRole('button', { name: /save changes/i }))
 
-    expect(screen.getByText('Frame 2', { exact: false })).toBeInTheDocument()
+    expect(screen.getByLabelText(/Frame 2 of 10/)).toBeInTheDocument()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
@@ -92,6 +130,28 @@ describe('score entry flow', () => {
     expect(screen.getByRole('table', { name: 'Bowling scorecard' })).toBeInTheDocument()
     expect(screen.getByRole('rowheader', { name: /Ada/ })).toBeInTheDocument()
     expect(screen.getByRole('rowheader', { name: /Grace/ })).toBeInTheDocument()
+  })
+
+  it('collapses larger active scorecards and expands them on request', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.type(screen.getByLabelText('Player 1 name'), 'Ada')
+    await user.click(screen.getByRole('button', { name: /add player/i }))
+    await user.type(screen.getByLabelText('Player 2 name'), 'Grace')
+    await user.click(screen.getByRole('button', { name: /add player/i }))
+    await user.type(screen.getByLabelText('Player 3 name'), 'Mina')
+    await user.click(screen.getByRole('button', { name: /add player/i }))
+    await user.type(screen.getByLabelText('Player 4 name'), 'Jo')
+    await user.click(screen.getByRole('button', { name: /start bowling/i }))
+
+    const toggle = screen.getByRole('button', { name: 'Show all players' })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.getByRole('table', { name: 'Bowling scorecard' }).parentElement).toHaveClass('is-collapsed')
+
+    await user.click(toggle)
+    expect(screen.getByRole('button', { name: 'Show fewer players' })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('table', { name: 'Bowling scorecard' }).parentElement).not.toHaveClass('is-collapsed')
   })
 
   it('adds a player when Enter is pressed in a name field', async () => {
@@ -297,6 +357,6 @@ describe('score entry flow', () => {
 
     expect(screen.getByText('Now bowling')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Ada' })).toBeInTheDocument()
-    expect(screen.getByText('Frame 2', { exact: false })).toBeInTheDocument()
+    expect(screen.getByLabelText(/Frame 2 of 10/)).toBeInTheDocument()
   })
 })
