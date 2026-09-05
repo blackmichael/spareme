@@ -8,6 +8,31 @@ describe('score entry flow', () => {
     window.history.replaceState({}, '', '/')
   })
 
+  it('welcomes first-time users and focuses the first player field', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    expect(screen.getByRole('dialog', { name: 'What is this?' })).toBeInTheDocument()
+    expect(screen.getByText(/Use spare me to keep score while you bowl/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /let.s roll/i }))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Player 1 name')).not.toHaveFocus()
+    expect(localStorage.getItem('spare-me:v1')).toContain('"hasSeenNux":true')
+  })
+
+  it('does not show the welcome modal again after dismissal', async () => {
+    const user = userEvent.setup()
+    const firstRender = render(<App />)
+
+    await user.click(screen.getByRole('button', { name: /let.s roll/i }))
+    firstRender.unmount()
+    render(<App />)
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
   it('starts a game and advances after a strike', async () => {
     const user = userEvent.setup()
     render(<App />)
@@ -21,7 +46,7 @@ describe('score entry flow', () => {
 
     await user.click(screen.getByRole('button', { name: /strike/i }))
     expect(screen.getByLabelText(/Frame 2 of 10/)).toBeInTheDocument()
-    expect(localStorage.getItem('lane-ten:v1')).toContain('Ada')
+    expect(localStorage.getItem('spare-me:v1')).toContain('Ada')
   })
 
   it('keeps the current frame and remaining pins visible in the scoring console', async () => {
@@ -113,7 +138,7 @@ describe('score entry flow', () => {
     await user.click(within(dialog).getByRole('button', { name: /save changes/i }))
 
     expect(screen.getByRole('button', { name: /edit Ada, frame 1/i })).toBeInTheDocument()
-    expect(localStorage.getItem('lane-ten:v1')).toContain('[[8,2]')
+    expect(localStorage.getItem('spare-me:v1')).toContain('[[8,2]')
   })
 
   it('supports adding players and changing modes', async () => {
@@ -202,7 +227,7 @@ describe('score entry flow', () => {
 
     expect(window.confirm).toHaveBeenCalledWith('Abandon this game? All scores will be permanently erased.')
     expect(screen.getByRole('heading', { name: "Who's bowling?" })).toBeInTheDocument()
-    expect(localStorage.getItem('lane-ten:v1')).toContain('"activeGame":null')
+    expect(localStorage.getItem('spare-me:v1')).toContain('"activeGame":null')
     vi.restoreAllMocks()
   })
 
@@ -218,7 +243,7 @@ describe('score entry flow', () => {
 
     expect(screen.getByText('Now bowling')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Ada' })).toBeInTheDocument()
-    expect(localStorage.getItem('lane-ten:v1')).toContain('"activeGame"')
+    expect(localStorage.getItem('spare-me:v1')).toContain('"activeGame"')
     vi.restoreAllMocks()
   })
 
@@ -238,7 +263,7 @@ describe('score entry flow', () => {
     await user.click(screen.getByRole('button', { name: /strike/i }))
     await user.click(screen.getByRole('button', { name: /spare me home/i }))
     expect(screen.getByRole('button', { name: /resume game/i })).toBeInTheDocument()
-    expect(localStorage.getItem('lane-ten:v1')).toContain('"activeGame"')
+    expect(localStorage.getItem('spare-me:v1')).toContain('"activeGame"')
   })
 
   it('returns home from a completed game without abandoning its saved score', async () => {
@@ -272,7 +297,7 @@ describe('score entry flow', () => {
     await user.click(screen.getByRole('button', { name: /switch to light mode/i }))
     expect(screen.getByRole('button', { name: /switch to dark mode/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /spare me home/i }).closest('.app-shell')).toHaveAttribute('data-theme', 'light')
-    expect(localStorage.getItem('lane-ten:v1')).toContain('"theme":"light"')
+    expect(localStorage.getItem('spare-me:v1')).toContain('"theme":"light"')
 
     await user.type(screen.getByLabelText('Player 1 name'), 'Ada')
     await user.click(screen.getByRole('button', { name: /start bowling/i }))

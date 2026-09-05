@@ -1,6 +1,6 @@
 import type { AppData } from './types'
 
-const STORAGE_KEY = 'lane-ten:v1'
+const STORAGE_KEY = 'spare-me:v1'
 const EMPTY_DATA: AppData = { activeGame: null, history: [], theme: 'dark' }
 
 export function loadData(): AppData {

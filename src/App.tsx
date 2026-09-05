@@ -324,6 +324,24 @@ function FrameEditor({ game, playerIndex, frameIndex, onSave, onClose }: {
   )
 }
 
+function NuxModal({ onClose }: { onClose: () => void }) {
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => event.key === 'Escape' && onClose()
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [onClose])
+
+  return (
+    <div className="dialog-backdrop">
+      <section className="nux-modal panel" role="dialog" aria-modal="true" aria-labelledby="nux-title" aria-describedby="nux-copy">
+        <h2 id="nux-title">What is this?</h2>
+        <p id="nux-copy">Use spare me to keep score while you bowl. Enter each roll, and it handles the score math while you focus on knocking pins down.</p>
+        <button className="button primary" autoFocus onClick={onClose}>Let’s roll <span>→</span></button>
+      </section>
+    </div>
+  )
+}
+
 function Scorecard({ game, onEdit }: { game: Game, onEdit?: (playerIndex: number, frameIndex: number) => void }) {
   const [expanded, setExpanded] = useState(false)
   const scorecardWrapRef = useRef<HTMLDivElement>(null)
@@ -680,6 +698,10 @@ export default function App() {
     }))
   }
 
+  const dismissNux = () => {
+    setData((current) => ({ ...current, hasSeenNux: true }))
+  }
+
   const backFromHeader = () => window.history.back()
 
   const isCurrentCompletedGame = route.kind === 'history'
@@ -719,6 +741,7 @@ export default function App() {
       ) : (
         <Setup history={data.history} activeGame={activeGame} initialNames={data.lastPlayers} onStart={startGame} onResume={() => navigate({ kind: 'game' })} onAbandon={abandonGame} onViewHistory={viewHistory} />
       )}
+      {route.kind === 'home' && !data.hasSeenNux && <NuxModal onClose={dismissNux} />}
       {editingFrame && activeGame?.status === 'active' && <FrameEditor game={activeGame} playerIndex={editingFrame.playerIndex} frameIndex={editingFrame.frameIndex} onSave={saveFrameEdit} onClose={() => setEditingFrame(null)} />}
       <SiteFooter onAbout={() => navigate({ kind: 'about' })} theme={data.theme ?? 'dark'} onToggleTheme={toggleTheme} />
     </div>

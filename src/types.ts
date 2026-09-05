@@ -29,4 +29,5 @@ export interface AppData {
   history: Game[]
   lastPlayers?: string[]
   theme?: Theme
+  hasSeenNux?: boolean
 }
